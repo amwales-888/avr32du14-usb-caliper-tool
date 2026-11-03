@@ -37,8 +37,11 @@
 void SYSTEM_Initialize(void)
 {
     CLOCK_Initialize();
+    SYSCFG_Initialize();
     PIN_MANAGER_Initialize();
     TCA0_Initialize();
+    USB0_Initialize();
+    USBDevice_Initialize();
     CPUINT_Initialize();
 }
 

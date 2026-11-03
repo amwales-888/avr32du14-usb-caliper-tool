@@ -43,8 +43,11 @@ extern "C" {
 #include "../system/utils/compiler.h"
 #include "config_bits.h"
 #include "../system/pins.h"
+#include "../usb/usb0.h"
+#include "../usb/usb_device.h"
 #include "../system/interrupt.h"
 #include "../system/clock.h"
+#include "../system/syscfg.h"
 #include "../timer/tca0.h"
 /**
  * @ingroup systemdriver

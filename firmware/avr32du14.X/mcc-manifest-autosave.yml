@@ -2,7 +2,7 @@
 
 manifest_file_version: 1.0.0
 project: avr32du14
-creation_date: 2026-10-20T22:10:09.414+01:00[Europe/London]
+creation_date: 2026-11-03T18:40:41.433Z[Europe/London]
 operating_system: Windows 11
 mcc_mode: IDE
 mcc_mode_version: v6.35
@@ -24,5 +24,8 @@ modules:
 - {name: '@mchp-mcc/pin-content-processor', type: MELODY, version: 3.11.0}
 - {name: '@mchp-mcc/scf-avr8-clkctrl-v3', type: MELODY, version: 2.2.0}
 - {name: '@mchp-mcc/scf-avr8-interrupt-v1', type: MELODY, version: 5.0.12}
+- {name: '@mchp-mcc/scf-avr8-syscfg-v1', type: MELODY, version: 1.0.1}
 - {name: '@mchp-mcc/scf-avr8-tca-v1', type: MELODY, version: 7.1.0}
+- {name: '@mchp-mcc/scf-avr8-usb-v1', type: MELODY, version: 1.0.0}
 - {name: '@mchp-mcc/timer', type: MELODY, version: 1.2.4}
+- {name: '@mchp-mcc/usb-device-stack', type: MELODY, version: 1.1.0}

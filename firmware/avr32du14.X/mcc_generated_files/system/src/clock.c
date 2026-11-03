@@ -51,7 +51,7 @@ void CLOCK_Initialize(void)
             );
 	
     ccp_write_io((void*)&(CLKCTRL.OSCHFCTRLA),(uint8_t)CLKCTRL_AUTOTUNE_OFF_gc   // AUTOTUNE OFF
-            | (uint8_t)CLKCTRL_FRQSEL_12M_gc   // FRQSEL 12 MHz system clock
+            | (uint8_t)CLKCTRL_FRQSEL_24M_gc   // FRQSEL 24 MHz system clock
             | (uint8_t)(0U << CLKCTRL_RUNSTDBY_bp)   // RUNSTDBY disabled
             | (uint8_t)CLKCTRL_ALGSEL_BIN_gc   // ALGSEL BIN
             );
@@ -85,7 +85,7 @@ void CLOCK_Initialize(void)
             | (uint8_t)CLKCTRL_SELHF_XTAL_gc   // SELHF XTAL
             );
 	
-    ccp_write_io((void*)&(CLKCTRL.MCLKTIMEBASE),(uint8_t)0xC   // TIMEBASE 0xC
+    ccp_write_io((void*)&(CLKCTRL.MCLKTIMEBASE),(uint8_t)0x18   // TIMEBASE 0x18
             );
 	
 

@@ -107,11 +107,11 @@ void TCA0_Initialize(void)
         | (0 << TCA_SINGLE_CMP2_bp)   // CMP2 disabled
         | (0 << TCA_SINGLE_OVF_bp);  // OVF disabled
 
-    TCA0.SINGLE.PER = 0xFFFFU;
+    TCA0.SINGLE.PER = 0x3A97U;
 
     TCA0.SINGLE.TEMP = 0x0;  // TEMP 0x0
 
-    TCA0.SINGLE.CTRLA = (TCA_SINGLE_CLKSEL_DIV1_gc)   // CLKSEL DIV1
+    TCA0.SINGLE.CTRLA = (TCA_SINGLE_CLKSEL_DIV16_gc)   // CLKSEL DIV16
         | (1 << TCA_SINGLE_ENABLE_bp)   // ENABLE enabled
         | (0 << TCA_SINGLE_RUNSTDBY_bp);  // RUNSTDBY disabled
 }

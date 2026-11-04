@@ -39,9 +39,18 @@
 #include <usb_hid_keycodes.h>
 #include <usb_hid_keyboard.h>
 
+
+// Standard library includes
+#include <stdbool.h>
+#include <util/delay.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+// Project specific headers
 #include <stdint.h>
 #include "scheduler.h"
 #include "button.h"
+#include "spc.h"
 
 volatile uint16_t sysTick;
 
@@ -49,9 +58,12 @@ volatile uint16_t sysTick;
 /* Task identifiers: index into mainTasks[] below                         */
 /* ---------------------------------------------------------------------- */
 enum {
-    mainTaskIdBlink = 0,
+    mainTaskIdSystem = 0,
+    mainTaskIdUSB,
+    mainTaskIdBlink,
     mainTaskIdButton,
     mainTaskIdkeyboard,
+    mainTaskIdSPC,
     mainTaskIdCount
 };
 
@@ -63,53 +75,160 @@ enum {
     mainButtonIdCount
 };
  
-
+/* ---------------------------------------------------------------------- */
+/* SPC states                                                             */
+/* ---------------------------------------------------------------------- */
 typedef enum {
-    TX_IDLE,
-    TX_START,
-    TX_KEY_DOWN,
-    TX_KEY_UP,
+    SPCTASK_IDLE = 0,
+    SPCTASK_START,
+    SPCTASK_PENDING,
+    SPCTASK_ERROR,
+    SPCTASK_OK,
+} spcState_t;
+
+static spcState_t spcState = SPCTASK_IDLE;
+
+/* ---------------------------------------------------------------------- */
+/* HID Keyboard text output states                                        */
+/* ---------------------------------------------------------------------- */
+typedef enum {
+    HIDTASK_IDLE = 0,
+    HIDTASK_START,
+    HIDTSAK_KEY_DOWN,
+    HIDTASK_KEY_UP,
 } txState_t;
+
+static txState_t txState = HIDTASK_IDLE;
+static uint8_t   txIndex = 0;
 
 static uint8_t keyboardBuf[16] = { HID_H, HID_E, HID_L, HID_L, HID_O };
 static uint8_t keyboardBufLen = 5;
 
-static txState_t txState = TX_IDLE;
-static uint8_t   txIndex = 0;
-
-
+/* ---------------------------------------------------------------------- */
+/* HID Keyboard Task                                                      */
+/* ---------------------------------------------------------------------- */
 static void keyboardTask(void)
 {
     switch (txState) {
 
-        case TX_IDLE:
+        case HIDTASK_IDLE:
             break;
-        case TX_START:
-            txState = TX_KEY_DOWN;
+        case HIDTASK_START:
+            txState = HIDTSAK_KEY_DOWN;
             txIndex = 0;
             break;    
-        case TX_KEY_DOWN:
+        case HIDTSAK_KEY_DOWN:
             if (USB_HIDKeyPressDown(keyboardBuf[txIndex]) == SUCCESS) {
-                txState = TX_KEY_UP;
+                txState = HIDTASK_KEY_UP;
+            } else {
+                /* check here for timeout */
             }
             break;
-        case TX_KEY_UP:
+        case HIDTASK_KEY_UP:
             if (USB_HIDKeyPressUp(keyboardBuf[txIndex]) == SUCCESS) {            
                 txIndex++;
                 if (txIndex == keyboardBufLen) {
-                    txState = TX_IDLE;
+                    spcState = SPCTASK_IDLE;
+                    txState = HIDTASK_IDLE;
                 } else {
-                    txState = TX_KEY_DOWN;
+                    txState = HIDTSAK_KEY_DOWN;
                 }
+            } else {
+                /* check here for timeout */
             }
             break;
     }
 }
 
+/* ---------------------------------------------------------------------- */
+/* Reading SPC Task                                                       */
+/* ---------------------------------------------------------------------- */
+
+static uint32_t nowMS;
+
+static void systemTask(void)
+{
+    /* Update system time MS */
+    nowMS = sysTick * 10;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Reading SPC Task                                                       */
+/* ---------------------------------------------------------------------- */
+
+static spc_reading_t spcData;
+
+static void readSpcTask(void)
+{
+    switch (spcState) {
+
+        case SPCTASK_IDLE:
+            break;
+        case SPCTASK_START:
+            spcState = SPCTASK_PENDING;            
+            break;    
+        case SPCTASK_PENDING: {
+
+            spc_status_t spc_status;
+            
+            spc_status = spcRead(&spcData, nowMS);
+            switch (spc_status) {
+                
+                case SPC_OK:
+                    spcState = SPCTASK_OK;
+                    break;
+                case SPC_PENDING:
+                    break;
+                case SPC_ERR_TIMEOUT:
+                    spcState = SPCTASK_ERROR;
+                    break;
+                case SPC_ERR_FORMAT:
+                    spcState = SPCTASK_ERROR;
+                    break;                                
+            }
+            
+            break;
+        }
+        case SPCTASK_ERROR:
+            spcState = SPCTASK_IDLE;
+            break;
+        case SPCTASK_OK:            
+
+            /* format the data and output it */            
+            txState = HIDTASK_START;
+            break;
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Handle USB Task                                                       */
+/* ---------------------------------------------------------------------- */
+
+// USB status variable
+RETURN_CODE_t status;
+
+static void handleUSBTask(void)
+{
+    status = USBDevice_Handle();
+    if (status != SUCCESS) {
+
+        (void)USB_Stop();        // detach + disable peripheral
+        USBDevice_Initialize();  // re-arms the stack and sets usbStatus again
+    }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Blink Task                                                             */
+/* ---------------------------------------------------------------------- */
+static void blinkTask(void)
+{
+    /* toggle LED here */    
+    LED1_Toggle();
+}
 
 
 /* ---------------------------------------------------------------------- */
-/* Button functions                                                       */
+/* Button callback functions                                              */
 /* ---------------------------------------------------------------------- */
 static uint8_t readButtonUser(void)
 {
@@ -121,9 +240,13 @@ static void onButtonPressed(uint8_t id)
 {
     (void)id;
     
-    if (txState == TX_IDLE) {
-        txState = TX_START;
-    }       
+//    if (txState == TX_IDLE) {
+//        txState = TX_START;
+//    }       
+        
+    if (spcState == SPCTASK_IDLE) {
+        spcState = SPCTASK_START;
+    }    
 }
  
 static void onButtonHeld(uint8_t id, uint32_t heldMs)
@@ -144,24 +267,17 @@ static button mainButtons[mainButtonIdCount] = {
 };
 
 /* ---------------------------------------------------------------------- */
-/* Task implementations                                                   */
-/* ---------------------------------------------------------------------- */
-static void blinkTask(void)
-{
-    /* toggle LED here */
-    
-    LED1_Toggle();
-}
-
-/* ---------------------------------------------------------------------- */
 /* Task table                                                             */
 /* nextRun = delay in ticks before the first run (for enabled tasks)      */
 /* ---------------------------------------------------------------------- */
 static schedulerTask mainTasks[mainTaskIdCount] = {
     /* func        nextRun period remaining state                    */
-    { blinkTask,    0,  SCHEDULERMS(500),   0,    schedulerTaskEnabled  },  /* every 500 ms */
-    { buttonTask,   0,  BUTTONPOLLPERIOD,   0,    schedulerTaskEnabled  },  /* every 10 ms  */
-    { keyboardTask, 0,  SCHEDULERMS(10),    0,    schedulerTaskEnabled  },  /* every 10 ms */    
+    { systemTask,    0,  SCHEDULERMS(10),    0,    schedulerTaskEnabled },  /* every 10 ms */
+    { handleUSBTask, 0,  SCHEDULERALWAYS,    0,    schedulerTaskEnabled },  /* every schedulerRun */
+    { blinkTask,     0,  SCHEDULERMS(500),   0,    schedulerTaskEnabled },  /* every 500 ms */
+    { buttonTask,    0,  BUTTONPOLLPERIOD,   0,    schedulerTaskEnabled },  /* every 10 ms  */
+    { keyboardTask,  0,  SCHEDULERMS(10),    0,    schedulerTaskEnabled },  /* every 10 ms */    
+    { readSpcTask,   0,  SCHEDULERALWAYS,    0,    schedulerTaskEnabled },  /* every schedulerRun */
 };
 
 
@@ -171,10 +287,6 @@ static schedulerTask mainTasks[mainTaskIdCount] = {
 void timerCallbackHandler(void) {
     sysTick++;
 }
-
-
-// USB status variable
-RETURN_CODE_t status;
 
 /* ---------------------------------------------------------------------- */
 /* Main application                                                       */
@@ -189,15 +301,7 @@ int main(void)
     Timer0.TimeoutCallbackRegister(timerCallbackHandler);
     Timer0.Start();    
     
-    while(1)
-    {
-        status = USBDevice_Handle();
-        if (status != SUCCESS)
-        {
-            (void)USB_Stop();        // detach + disable peripheral
-            USBDevice_Initialize();  // re-arms the stack and sets usbStatus again
-        }
-        
-        schedulerRun();
+    while(1) {
+         schedulerRun();
     }    
 }

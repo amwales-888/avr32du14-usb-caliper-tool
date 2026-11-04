@@ -33,6 +33,7 @@
 */
 
 #include "../system.h"
+#include "../../../spc.h"
 
 void SYSTEM_Initialize(void)
 {
@@ -42,6 +43,11 @@ void SYSTEM_Initialize(void)
     TCA0_Initialize();
     USB0_Initialize();
     USBDevice_Initialize();
+    
+    // spcInit() MUST be called before interrupts are enabled     
+    spcInit();
+    
+
     CPUINT_Initialize();
 }
 
